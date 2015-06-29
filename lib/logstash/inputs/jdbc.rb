@@ -44,7 +44,7 @@ class LogStash::Inputs::Jdbc < LogStash::Inputs::Base
   # If undefined, Logstash will complain, even if codec is unused.
   default :codec, "plain" 
 
-  # Statement to execute
+  # Statement to execute, or file with statement inside
   # To use parameters, use named parameter syntax.
   # For example:
   # "SELECT * FROM MYTABLE WHERE id = :target_id"
@@ -64,6 +64,10 @@ class LogStash::Inputs::Jdbc < LogStash::Inputs::Base
   def register
     require "rufus/scheduler"
     prepare_jdbc_connection()
+
+    if File.exists?(@statement)
+      @statement = File.open(@statement, 'r') { |f| f.read }.strip
+    end
   end # def register
 
   def run(queue)
@@ -86,6 +90,16 @@ class LogStash::Inputs::Jdbc < LogStash::Inputs::Base
   end # def teardown
 
   private
+  def update_watermarks(row)
+    row.each do |k, v|
+      last_min_field = "last_min_#{k}"
+      last_max_field = "last_max_#{k}"
+      @parameters[last_min_field] = [@parameters[last_min_field], v].compact.min
+      @parameters[last_max_field] = [@parameters[last_max_field], v].compact.max
+    end
+  end
+
+  private
   def execute_query(queue)
     # update default parameters
     @parameters['sql_last_start'] = @sql_last_start
@@ -93,6 +107,7 @@ class LogStash::Inputs::Jdbc < LogStash::Inputs::Base
       event = LogStash::Event.new(row)
       decorate(event)
       queue << event
+      update_watermarks(row)
     end
   end
 end # class LogStash::Inputs::Jdbc

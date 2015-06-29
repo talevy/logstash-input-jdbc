@@ -62,6 +62,8 @@ module LogStash::PluginMixins::Jdbc
       #TODO return false and let the plugin raise a LogStash::ConfigurationError
       raise e
     end
+
+    #@sql_last_start = Time.now.utc
   end # def prepare_jdbc_connection
 
   public
@@ -78,6 +80,7 @@ module LogStash::PluginMixins::Jdbc
       @logger.debug? and @logger.debug("Executing JDBC query", :statement => statement, :parameters => parameters)
       @sql_last_start = Time.now.utc
       query.all do |row|
+        p "inside"
         #Stringify row keys
         yield Hash[row.map { |k, v| [k.to_s, v] }]
       end
