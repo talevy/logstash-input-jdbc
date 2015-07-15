@@ -6,14 +6,38 @@ require "yaml" # persistence
 
 # INFORMATION
 #
-# This plugin was created as a way to iteratively ingest any database
-# with a JDBC interface into Logstash.
+# This plugin ingests rows from any database with a JDBC interface into Logstash.
 #
-# ==== JDBC Mixin
+# ==== Drivers
 #
-# This plugin utilizes a mixin that helps Logstash plugins manage JDBC connections.
-# The mixin provides its own set of configurations (some are required) to properly 
-# set up the connection to the appropriate database.
+# This plugin does not come packaged with JDBC driver libraries. The desired 
+# jdbc driver library must be explicitly passed in to the plugin using the
+# `jdbc_driver_library` configuration option.
+#
+# ==== Usage:
+#
+# Here is an example of setting up the plugin to fetch data from a MySQL database.
+# First, we place the appropriate JDBC driver library in our current
+# path (this can be placed anywhere on your filesystem). In this example, we connect to 
+# the 'mydb' database using the user: 'mysql' and wish to input all rows in the 'songs'
+# table that match a specific artist. The following examples demonstrates a possible 
+# Logstash configuration for this. The `schedule` option in this example will 
+# instruct the plugin to execute this input statement on the minute, every minute.
+#
+# [source,ruby]
+# ----------------------------------
+# input {
+#   jdbc {
+#     jdbc_driver_library => "mysql-connector-java-5.1.36-bin.jar"
+#     jdbc_driver_class => "com.mysql.jdbc.Driver"
+#     jdbc_connection_string => "jdbc:mysql://localhost:3306/mydb"
+#     jdbc_user => "mysql"
+#     parameters => { "favorite_artist" => "Beethoven" }
+#     schedule => "* * * * *"
+#     statement => "SELECT * from songs where artist = :favorite_artist"
+#   }
+# }
+# ----------------------------------
 #
 # ==== Predefined Parameters
 #
@@ -21,26 +45,10 @@ require "yaml" # persistence
 # Here is the list:
 #
 # |==========================================================
-# |sql_last_start |The time the last query executed in plugin
+# |sql_last_start | The last time a statement was executed. This is set to
+# |               | Thursday, 1 January 1970 before any query is run, and updated 
+# |               | accordingly after first query is run.
 # |==========================================================
-#
-# ==== Usage:
-#
-# This is an example logstash config
-# [source,ruby]
-# ----------------------------------
-# input {
-#   jdbc {
-#     jdbc_driver_class => "org.apache.derby.jdbc.EmbeddedDriver" (required; from mixin)
-#     jdbc_connection_string => "jdbc:derby:memory:testdb;create=true" (required; from mixin)
-#     jdbc_user => "username" (from mixin)
-#     jdbc_password => "mypass" (from mixin)
-#     statement => "SELECT * from table where created_at > :sql_last_start and id = :my_id" (required)
-#     parameters => { "my_id" => "231" }
-#     schedule => "* * * * *"
-#   }
-# }
-# ----------------------------------
 #
 # ==== statement vs statement_filepath
 # 
