@@ -445,7 +445,7 @@ describe LogStash::Inputs::Jdbc do
       test_table.insert(:num => nums[3], :created_at => Time.now.utc)
       test_table.insert(:num => nums[4], :created_at => Time.now.utc)
       plugin.run(queue)
-      expect(queue.length).to eq(3) # Only values greater than 20 should be grabbed.
+      expect(queue.length).to eq(3) # Only values greater than 20 shuld be grabbed.
       expect(plugin.instance_variable_get("@sql_last_value")).to eq(50)
     end
   end
@@ -494,6 +494,60 @@ describe LogStash::Inputs::Jdbc do
       expect(queue.length).to eq(3) # Only values greater than 20 should be grabbed.
       expect(plugin.instance_variable_get("@sql_last_value")).to eq(20)
       expect(plugin.instance_variable_get("@tracking_column_warning_sent")).to eq(true)
+    end
+  end
+
+  context "when tracking_column of type Datetime" do
+    let(:mixin_settings) do
+      { "jdbc_user" => ENV['USER'], "jdbc_driver_class" => "org.apache.derby.jdbc.EmbeddedDriver",
+        "jdbc_connection_string" => "jdbc:derby:memory:testdb;create=true"
+      }
+    end
+
+    let(:settings) do
+      { "statement" => "SELECT num, created_at FROM test_table WHERE created_at > :sql_last_value order by created_at",
+        "use_column_value" => true,
+        "tracking_column" => "created_at",
+        "last_run_metadata_path" => Stud::Temporary.pathname }
+    end
+
+    let(:nums) do
+      ["2010-09-10 10:21:30", "2010-09-10 10:22:30",
+       "2010-09-10 10:23:30", "2010-09-10 10:19:30"]
+        .map{ |x| Sequel.string_to_datetime(x) }
+    end
+
+    let(:last_run_value) { Sequel.string_to_datetime("2010-09-10 10:20:30") }
+
+    before do
+      File.write(settings["last_run_metadata_path"], YAML.dump(last_run_value))
+      plugin.register
+    end
+
+    after do
+      plugin.stop
+    end
+
+    it "should work" do
+      test_table = db[:test_table]
+      plugin.run(queue)
+      expect(plugin.instance_variable_get("@sql_last_value")).to eq(last_run_value)
+      expect(queue.length).to eq(0) # Shouldn't grab anything here.
+      test_table.insert(:created_at => nums[0])
+      test_table.insert(:created_at => nums[1])
+      plugin.run(queue)
+      plugin.stop
+      plugin.register
+      expect(queue.length).to eq(2)
+      expect(plugin.instance_variable_get("@sql_last_value")).to eq(nums[1])
+      test_table.insert(:created_at => nums[2])
+      test_table.insert(:created_at => nums[3])
+      plugin.run(queue)
+      plugin.stop
+      plugin.register
+      expect(queue.length).to eq(2)
+      expect(plugin.instance_variable_get("@sql_last_value")).to eq(nums[2])
+      expect(plugin.instance_variable_get("@tracking_column_warning_sent")).to eq(false)
     end
   end
 

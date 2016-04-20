@@ -210,6 +210,7 @@ module LogStash::PluginMixins::Jdbc
         end
       else
         query.each do |row|
+          p row
           sql_last_value = get_column_value(row) if @use_column_value
           yield extract_values_from(row)
         end
